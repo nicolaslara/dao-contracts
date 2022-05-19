@@ -157,6 +157,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-auth-manager"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-multi-test",
+ "cw-proposal-single",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw20",
+ "cw3",
+ "indexable-hooks",
+ "proposal-hooks",
+ "schemars",
+ "serde",
+ "testing",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-controllers"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
