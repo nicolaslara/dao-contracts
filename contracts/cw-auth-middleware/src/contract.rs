@@ -17,8 +17,6 @@ use crate::{
 const CONTRACT_NAME: &str = "crates.io:cw-auth-manager";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const UPDATE_REPLY_ID: u64 = 1000;
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -163,13 +161,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     match msg.id {
         // Update reply errors are always ignored.
-        UPDATE_REPLY_ID => {
-            if msg.result.is_err() {
-                return Ok(Response::new().add_attribute("update_error", msg.result.unwrap_err()));
-            }
-            Ok(Response::new()
-                .add_attribute("update_success", format!("{:?}", msg.result.unwrap())))
-        }
+        id if id == AUTH_MANAGER.get_update_reply_id() => AUTH_MANAGER.sub_message_reply(msg),
         id => Err(ContractError::Std(cosmwasm_std::StdError::GenericErr {
             msg: format!("Unknown reply id: {}", id),
         })),

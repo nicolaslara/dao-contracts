@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, wasm_execute, Addr, Binary, CosmosMsg, Deps, QuerierWrapper, Response, StdResult,
-    Storage, SubMsg,
+    to_binary, wasm_execute, Addr, Binary, CosmosMsg, Deps, QuerierWrapper, Reply, Response,
+    StdResult, Storage, SubMsg,
 };
 
 use crate::{
@@ -75,5 +75,12 @@ pub trait Authorization {
     ) -> Result<Response, ContractError> {
         let sub_msgs = self.update_sub_authorization_msgs(deps.storage, msgs, sender)?;
         Ok(Response::default().add_submessages(sub_msgs))
+    }
+
+    fn sub_message_reply(&self, msg: Reply) -> Result<Response, ContractError> {
+        if msg.result.is_err() {
+            return Ok(Response::new().add_attribute("update_error", msg.result.unwrap_err()));
+        }
+        Ok(Response::new().add_attribute("update_success", format!("{:?}", msg.result.unwrap())))
     }
 }
