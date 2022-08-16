@@ -1,9 +1,10 @@
 #![cfg(test)]
 use cosmwasm_std::{coin, coins, Addr, BankMsg, CosmosMsg, Empty, StakingMsg};
+use cw_auth_middleware::msg::IsAuthorizedResponse;
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
 use crate::{
-    msg::{ExecuteMsg, InstantiateMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::Kind,
 };
 
@@ -58,28 +59,30 @@ fn test_simple_filtering() {
     )
     .unwrap();
 
-    app.execute_contract(
-        Addr::unchecked(CREATOR),
-        contract_addr.clone(),
-        &ExecuteMsg::UpdateExecutedAuthorizationState {
-            sender: Addr::unchecked("Someone"),
-            msgs: msgs.clone(),
-        },
-        &[],
-    )
-    .unwrap();
+    let IsAuthorizedResponse { authorized } = app
+        .wrap()
+        .query_wasm_smart(
+            contract_addr.clone(),
+            &QueryMsg::Authorize {
+                sender: Addr::unchecked("Someone"),
+                msgs: msgs.clone(),
+            },
+        )
+        .unwrap();
+    assert!(authorized);
 
     // No authorizations for sender
-    app.execute_contract(
-        Addr::unchecked(CREATOR),
-        contract_addr.clone(),
-        &ExecuteMsg::UpdateExecutedAuthorizationState {
-            sender: Addr::unchecked("Someone_else"),
-            msgs,
-        },
-        &[],
-    )
-    .unwrap_err();
+    let IsAuthorizedResponse { authorized } = app
+        .wrap()
+        .query_wasm_smart(
+            contract_addr.clone(),
+            &QueryMsg::Authorize {
+                sender: Addr::unchecked("Someone_else"),
+                msgs,
+            },
+        )
+        .unwrap();
+    assert!(!authorized);
 
     let msgs: Vec<CosmosMsg> = vec![StakingMsg::Delegate {
         validator: "validator".to_string(),
@@ -87,14 +90,15 @@ fn test_simple_filtering() {
     }
     .into()];
 
-    app.execute_contract(
-        Addr::unchecked(CREATOR),
-        contract_addr.clone(),
-        &ExecuteMsg::UpdateExecutedAuthorizationState {
-            sender: Addr::unchecked("Someone"),
-            msgs: msgs.clone(),
-        },
-        &[],
-    )
-    .unwrap_err();
+    let IsAuthorizedResponse { authorized } = app
+        .wrap()
+        .query_wasm_smart(
+            contract_addr.clone(),
+            &QueryMsg::Authorize {
+                sender: Addr::unchecked("Someone"),
+                msgs: msgs.clone(),
+            },
+        )
+        .unwrap();
+    assert!(!authorized);
 }

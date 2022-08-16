@@ -1,9 +1,13 @@
 use cosmwasm_std::{Addr, Response};
+use cw_auth_middleware::interface::Authorization as AuthorizationTrait;
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::ContractError;
+use crate::{
+    utils::{deep_partial_match, msg_to_value, str_to_value},
+    ContractError,
+};
 use cw_auth_middleware::ContractError as AuthorizationError;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -70,5 +74,77 @@ pub struct Authorization {
     pub matcher: String,
 }
 
-pub const CONFIG: Item<Config> = Item::new("config");
-pub const ALLOWED: Map<Addr, Vec<Authorization>> = Map::new("allowed");
+pub struct MessageFilter {
+    pub config: Item<'static, Config>,
+    pub allowed: Map<'static, Addr, Vec<Authorization>>,
+}
+
+impl MessageFilter {
+    pub const fn new() -> Self {
+        MessageFilter {
+            config: Item::new("config"),
+            allowed: Map::new("allowed"),
+        }
+    }
+}
+
+impl AuthorizationTrait for MessageFilter {
+    fn is_authorized(
+        &self,
+        storage: &dyn cosmwasm_std::Storage,
+        _querier: &cosmwasm_std::QuerierWrapper,
+        msgs: &Vec<cosmwasm_std::CosmosMsg>,
+        sender: &Addr,
+    ) -> Result<bool, cw_auth_middleware::ContractError> {
+        let config = self.config.load(storage)?;
+        let auths = self.allowed.load(storage, sender.clone());
+
+        // If there are no auths, return the default for each Kind
+        if auths.is_err() {
+            return Ok(config.default_authorization());
+        }
+
+        let auths = auths.unwrap();
+
+        // check that all messages can be converted to values
+        for m in msgs {
+            msg_to_value(&m).map_err(|e| cw_auth_middleware::ContractError::Unauthorized {
+                reason: Some(e.to_string()),
+            })?;
+        }
+        // check that all auths can be converted to values
+        for a in &auths {
+            str_to_value(&a.matcher).map_err(|e| {
+                cw_auth_middleware::ContractError::Unauthorized {
+                    reason: Some(e.to_string()),
+                }
+            })?;
+        }
+
+        let matched = auths.iter().any(|a| {
+            msgs.iter().all(|m| {
+                deep_partial_match(
+                    &msg_to_value(&m).unwrap(),
+                    &str_to_value(&a.matcher).unwrap(),
+                )
+            })
+        });
+
+        if matched {
+            return match config.kind {
+                Kind::Allow {} => Ok(true),
+                Kind::Reject {} => Ok(false),
+            };
+        }
+        Ok(config.default_authorization())
+    }
+
+    fn get_sub_authorizations(
+        &self,
+        _storage: &dyn cosmwasm_std::Storage,
+    ) -> Result<Vec<Addr>, cw_auth_middleware::ContractError> {
+        Ok(vec![])
+    }
+}
+
+pub const MESSAGE_FILTER: MessageFilter = MessageFilter::new();
