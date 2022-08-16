@@ -12,4 +12,3 @@ pub struct Config {
 
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const AUTHORIZATIONS: Map<&Addr, Vec<Addr>> = Map::new("authorizations");
-pub const GROUPS: Map<&str, Addr> = Map::new("groups");

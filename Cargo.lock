@@ -223,8 +223,6 @@ dependencies = [
  "cw2 0.13.4",
  "cw20 0.13.4",
  "cw3",
- "cw4",
- "cw4-group",
  "indexable-hooks",
  "message-filter",
  "schemars",
