@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, wasm_execute, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Reply, Response, StdResult, Storage, SubMsg, WasmMsg,
+    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply, Response,
+    StdResult, Storage, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw_core_interface::voting::IsActiveResponse;
@@ -27,10 +27,7 @@ use crate::{
     proposal::advance_proposal_id,
     query::ProposalListResponse,
     query::{ProposalResponse, VoteInfo, VoteListResponse, VoteResponse},
-    state::{
-        Ballot, AUTHORIZATION_MODULE, BALLOTS, CONFIG, PROPOSALS, PROPOSAL_COUNT, PROPOSAL_HOOKS,
-        VOTE_HOOKS,
-    },
+    state::{Ballot, BALLOTS, CONFIG, PROPOSALS, PROPOSAL_COUNT, PROPOSAL_HOOKS, VOTE_HOOKS},
 };
 
 const UPDATE_REPLY_ID: u64 = 100_000_000;
@@ -123,10 +120,6 @@ pub fn execute(
         ExecuteMsg::RemoveVoteHook { address } => {
             execute_remove_vote_hook(deps, env, info, address)
         }
-        ExecuteMsg::AddAuthorizationModule { address } => {
-            execute_add_auth_module(deps, env, info, address)
-        }
-        ExecuteMsg::RemoveAuthorizationModule {} => execute_remove_auth_module(deps, env, info),
     }
 }
 
@@ -272,46 +265,7 @@ pub fn execute_execute(
         None => vec![],
     };
 
-    // Check that the proposal is authorized if authorizations are configured
     let response = Response::default();
-    let response = if let Some(auths) = AUTHORIZATION_MODULE.may_load(deps.storage)? {
-        let authorized = cw_auth_middleware::utils::check_authorization(
-            deps.as_ref(),
-            &vec![auths.clone()],
-            &prop.msgs.clone(),
-            &info.sender,
-        );
-
-        if !authorized {
-            return Err(ContractError::Unauthorized {});
-        }
-
-        let response = response
-            .add_submessage(SubMsg::reply_on_error(
-                wasm_execute(
-                    auths.to_string(),
-                    &cw_auth_middleware::msg::ExecuteMsg::UpdateExecutedAuthorizationState {
-                        msgs: prop.msgs.clone(),
-                        sender: info.sender.clone(),
-                    },
-                    vec![],
-                )?,
-                UPDATE_REPLY_ID,
-            ))
-            .add_attribute("authorized_by", auths.to_string());
-
-        response.add_message(wasm_execute(
-            auths.to_string(),
-            &cw_auth_middleware::msg::ExecuteMsg::UpdateExecutedAuthorizationState {
-                msgs: prop.msgs.clone(),
-                sender: info.sender.clone(),
-            },
-            vec![],
-        )?)
-    } else {
-        response
-    };
-
     let response = if !prop.msgs.is_empty() {
         let execute_message = WasmMsg::Execute {
             contract_addr: config.dao.to_string(),
@@ -634,41 +588,6 @@ pub fn execute_remove_vote_hook(
     Ok(Response::default()
         .add_attribute("action", "remove_vote_hook")
         .add_attribute("address", address))
-}
-
-pub fn execute_add_auth_module(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    address: String,
-) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-    if config.dao != info.sender {
-        // Only DAO can add auths
-        return Err(ContractError::Unauthorized {});
-    }
-
-    let validated_address = deps.api.addr_validate(&address)?;
-
-    AUTHORIZATION_MODULE.save(deps.storage, &validated_address)?;
-
-    Ok(Response::default()
-        .add_attribute("action", "add_auth_module")
-        .add_attribute("address", address))
-}
-
-pub fn execute_remove_auth_module(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-    if config.dao != info.sender {
-        // Only DAO can remove auths
-        return Err(ContractError::Unauthorized {});
-    }
-    AUTHORIZATION_MODULE.remove(deps.storage);
-    Ok(Response::default().add_attribute("action", "remove_auth_module"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

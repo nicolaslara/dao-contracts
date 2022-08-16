@@ -435,7 +435,6 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
- "cw-auth-middleware",
  "cw-core",
  "cw-core-interface",
  "cw-core-macros",
@@ -456,7 +455,6 @@ dependencies = [
  "cw721-base",
  "cw721-stake",
  "indexable-hooks",
- "message-filter",
  "proposal-hooks",
  "schemars",
  "serde",
@@ -464,7 +462,6 @@ dependencies = [
  "thiserror",
  "vote-hooks",
  "voting",
- "whitelist",
 ]
 
 [[package]]
