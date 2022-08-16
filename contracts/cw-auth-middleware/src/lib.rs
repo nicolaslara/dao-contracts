@@ -1,8 +1,8 @@
 pub mod contract;
 mod error;
+pub mod interface;
 pub mod msg;
 pub mod state;
-pub mod utils;
 
 #[cfg(test)]
 mod tests;
