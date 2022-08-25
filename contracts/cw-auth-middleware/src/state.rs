@@ -4,8 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    execute,
     interface::Authorization,
-    msg::{IsAuthorizedResponse, QueryMsg},
+    msg::{ExecuteMsg, IsAuthorizedResponse, QueryMsg},
     ContractError,
 };
 
@@ -42,7 +43,7 @@ impl AuthorizationManager {
     }
 }
 
-impl Authorization for AuthorizationManager {
+impl Authorization<ExecuteMsg> for AuthorizationManager {
     fn is_authorized(
         &self,
         storage: &dyn Storage,
@@ -103,6 +104,39 @@ impl Authorization for AuthorizationManager {
             Err(ContractError::Unauthorized {
                 reason: Some("No sub authorization passed".to_string()),
             })
+        }
+    }
+
+    fn handle_execute_extension(
+        &self,
+        deps: cosmwasm_std::DepsMut,
+        env: cosmwasm_std::Env,
+        info: cosmwasm_std::MessageInfo,
+        msg: ExecuteMsg,
+    ) -> Result<Response, ContractError> {
+        match msg {
+            ExecuteMsg::AddAuthorization { auth_contract } => {
+                execute::add_authorization(deps, env, info, auth_contract)
+            }
+            ExecuteMsg::RemoveAuthorization { auth_contract } => {
+                execute::remove_authorization(deps, info, auth_contract.to_string())
+            }
+            ExecuteMsg::UpdateExecutedAuthorizationState { msgs, sender } => {
+                AUTH_MANAGER.update_authorization_state(deps.as_ref(), &msgs, &sender, &info.sender)
+            }
+            ExecuteMsg::Execute { msgs } => execute::execute(deps.as_ref(), msgs, info.sender),
+            ExecuteMsg::ReplaceOwner { new_dao } => {
+                let mut config = AUTH_MANAGER.config.load(deps.storage)?;
+                if info.sender != config.dao {
+                    Err(ContractError::Unauthorized { reason: None })
+                } else {
+                    config.dao = new_dao.clone();
+                    AUTH_MANAGER.config.save(deps.storage, &config)?;
+                    Ok(Response::default()
+                        .add_attribute("action", "replace_dao")
+                        .add_attribute("new_dao", new_dao))
+                }
+            }
         }
     }
 }

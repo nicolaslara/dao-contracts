@@ -3,7 +3,10 @@ use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
 use cw_core::msg::ModuleInstantiateInfo;
 
-use crate::msg::{ExecuteMsg, InstantiateMsg};
+use crate::{
+    interface::AuthoriazationExecuteMsg,
+    msg::{ExecuteMsg, InstantiateMsg},
+};
 
 const CREATOR_ADDR: &str = "creator";
 
@@ -149,9 +152,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked("Evil sender"),
         auth_manager.clone(),
-        &ExecuteMsg::Execute {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
-        },
+        }),
         &[],
     )
     .unwrap_err(); // This should fail
@@ -214,9 +217,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
         auth_manager.clone(),
-        &ExecuteMsg::AddAuthorization {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::AddAuthorization {
             auth_contract: and_addr.to_string(),
-        },
+        }),
         &[],
     )
     .unwrap();
@@ -225,9 +228,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked("RaNdO"),
         auth_manager.clone(),
-        &ExecuteMsg::Execute {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
-        },
+        }),
         &[],
     )
     .unwrap_err();
@@ -236,7 +239,7 @@ fn test_direct_authorizations() {
     app.execute_contract(
         whitelisted_addr.clone(),
         auth_manager.clone(),
-        &ExecuteMsg::Execute { msgs: vec![msg] },
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute { msgs: vec![msg] }),
         &[],
     )
     .unwrap();
@@ -292,9 +295,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         whitelisted_addr.clone(),
         auth_manager.clone(),
-        &ExecuteMsg::Execute {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
-        },
+        }),
         &[],
     )
     .unwrap_err(); // This should fail
@@ -303,9 +306,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         employee_addr.clone(),
         auth_manager.clone(),
-        &ExecuteMsg::Execute {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
-        },
+        }),
         &[],
     )
     .unwrap_err(); // This should fail
@@ -325,9 +328,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         employee_addr.clone(),
         auth_manager.clone(),
-        &ExecuteMsg::Execute {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
-        },
+        }),
         &[],
     )
     .unwrap(); // This should work!
@@ -344,9 +347,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         employee_addr.clone(),
         auth_manager.clone(),
-        &ExecuteMsg::Execute {
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
-        },
+        }),
         &[],
     )
     .unwrap_err(); // This should fail!

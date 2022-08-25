@@ -1,16 +1,38 @@
 use cosmwasm_std::{
-    to_binary, wasm_execute, Addr, Binary, CosmosMsg, Deps, QuerierWrapper, Reply, Response,
-    StdResult, Storage, SubMsg,
+    to_binary, wasm_execute, Addr, Binary, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env,
+    MessageInfo, QuerierWrapper, Reply, Response, StdResult, Storage, SubMsg,
 };
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    msg::{ExecuteMsg, IsAuthorizedResponse},
-    ContractError,
-};
+use crate::msg::IsAuthorizedResponse;
+use crate::ContractError;
 
 const UPDATE_REPLY_ID: u64 = 1000;
 
-pub trait Authorization {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthoriazationExecuteMsg<ExecuteExt = Empty>
+where
+    ExecuteExt: CustomMsg,
+{
+    /// Some authorizations may want to track information about the users or
+    /// messages to determine if they authorize or not. This message should be
+    /// sent every time the authorizations are successfully used so that
+    /// sub-authorizations can update their internal state.
+    UpdateExecutedAuthorizationState {
+        msgs: Vec<CosmosMsg>,
+        sender: Addr,
+    },
+
+    // Extensions allow implementors to add their own custom messages to the contract
+    Extension(ExecuteExt),
+}
+
+pub trait Authorization<ExecuteExt = Empty>
+where
+    ExecuteExt: CustomMsg,
+{
     fn is_authorized(
         &self,
         storage: &dyn Storage,
@@ -30,6 +52,33 @@ pub trait Authorization {
                 .is_authorized(deps.storage, &deps.querier, &msgs, &sender)
                 .unwrap_or(false),
         })
+    }
+
+    fn execute(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        msg: AuthoriazationExecuteMsg<ExecuteExt>,
+    ) -> Result<Response, ContractError> {
+        match msg {
+            AuthoriazationExecuteMsg::UpdateExecutedAuthorizationState { msgs, sender } => {
+                self.update_authorization_state(deps.as_ref(), &msgs, &sender, &info.sender)
+            }
+            AuthoriazationExecuteMsg::Extension(msg) => {
+                self.handle_execute_extension(deps, env, info, msg)
+            }
+        }
+    }
+
+    fn handle_execute_extension(
+        &self,
+        _deps: DepsMut,
+        _env: Env,
+        _info: MessageInfo,
+        _msg: ExecuteExt,
+    ) -> Result<Response, ContractError> {
+        Ok(Response::default())
     }
 
     fn get_sub_authorizations(&self, storage: &dyn Storage) -> Result<Vec<Addr>, ContractError>;
@@ -52,7 +101,7 @@ pub trait Authorization {
                 Ok(SubMsg::reply_on_error(
                     wasm_execute(
                         auth.to_string(),
-                        &ExecuteMsg::UpdateExecutedAuthorizationState {
+                        &AuthoriazationExecuteMsg::<ExecuteExt>::UpdateExecutedAuthorizationState {
                             msgs: msgs.clone(),
                             sender: sender.clone(),
                         },

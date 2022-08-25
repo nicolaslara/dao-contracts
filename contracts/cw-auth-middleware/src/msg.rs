@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, CosmosMsg};
+use cosmwasm_std::{Addr, CosmosMsg, CustomMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +32,8 @@ pub enum ExecuteMsg {
         new_dao: Addr,
     },
 }
+
+impl CustomMsg for ExecuteMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
