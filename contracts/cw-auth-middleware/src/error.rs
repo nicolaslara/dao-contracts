@@ -13,5 +13,5 @@ pub enum ContractError {
     InvalidProposal {},
 
     #[error("Unauthorized {reason:?}")]
-    Unauthorized { reason: Option<String> },
+    UnauthorizedBecause { reason: String },
 }

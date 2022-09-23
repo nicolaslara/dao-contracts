@@ -216,6 +216,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cw-authorizations",
  "cw-core",
  "cw-multi-test 0.13.4",
  "cw-storage-plus 0.13.4",
@@ -230,6 +231,17 @@ dependencies = [
  "testing",
  "thiserror",
  "whitelist",
+]
+
+[[package]]
+name = "cw-authorizations"
+version = "0.1.0"
+source = "git+https://github.com/nicolaslara/authorizations/#a8c40b24a5cfaabb4b771d9d27e985b0032fc2bd"
+dependencies = [
+ "cosmwasm-std",
+ "schemars",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
