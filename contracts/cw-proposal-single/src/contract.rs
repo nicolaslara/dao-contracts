@@ -30,8 +30,6 @@ use crate::{
     state::{Ballot, BALLOTS, CONFIG, PROPOSALS, PROPOSAL_COUNT, PROPOSAL_HOOKS, VOTE_HOOKS},
 };
 
-const UPDATE_REPLY_ID: u64 = 100_000_000;
-
 const CONTRACT_NAME: &str = "crates.io:cw-govmod-single";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -265,16 +263,15 @@ pub fn execute_execute(
         None => vec![],
     };
 
-    let response = Response::default();
     let response = if !prop.msgs.is_empty() {
         let execute_message = WasmMsg::Execute {
             contract_addr: config.dao.to_string(),
             msg: to_binary(&cw_core::msg::ExecuteMsg::ExecuteProposalHook { msgs: prop.msgs })?,
             funds: vec![],
         };
-        response.add_message(execute_message)
+        Response::<Empty>::default().add_message(execute_message)
     } else {
-        response
+        Response::default()
     };
 
     let hooks = proposal_status_changed_hooks(
@@ -721,19 +718,6 @@ pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, 
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
-    if msg.id == UPDATE_REPLY_ID {
-        if PROPOSAL_HOOKS.query_hooks(deps.as_ref())?.hooks.len() >= UPDATE_REPLY_ID as usize {
-            return Err(ContractError::TooManyHooks {});
-        }
-
-        if msg.result.is_err() {
-            return Ok(Response::new().add_attribute("update_error", msg.result.unwrap_err()));
-        }
-        return Ok(
-            Response::new().add_attribute("update_success", format!("{:?}", msg.result.unwrap()))
-        );
-    }
-
     if msg.id % 2 == 0 {
         // Proposal hook so we can just divide by two for index
         let idx = msg.id / 2;
