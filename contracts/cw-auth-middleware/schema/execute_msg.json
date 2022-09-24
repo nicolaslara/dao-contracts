@@ -5,109 +5,16 @@
     {
       "type": "object",
       "required": [
-        "add_authorization"
+        "set_authorization"
       ],
       "properties": {
-        "add_authorization": {
+        "set_authorization": {
           "type": "object",
           "required": [
             "auth_contract"
           ],
           "properties": {
             "auth_contract": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "remove_authorization"
-      ],
-      "properties": {
-        "remove_authorization": {
-          "type": "object",
-          "required": [
-            "auth_contract"
-          ],
-          "properties": {
-            "auth_contract": {
-              "$ref": "#/definitions/Addr"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "description": "Since there isn't a central list of groups, the authorization manager keeps track of the groups it cares about",
-      "type": "object",
-      "required": [
-        "add_group"
-      ],
-      "properties": {
-        "add_group": {
-          "type": "object",
-          "required": [
-            "cw4_group_contract",
-            "name"
-          ],
-          "properties": {
-            "cw4_group_contract": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "remove_group"
-      ],
-      "properties": {
-        "remove_group": {
-          "type": "object",
-          "required": [
-            "name"
-          ],
-          "properties": {
-            "name": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "description": "Some authorizations may want to track information about the users or messages to determine if they authorize or not. This message should be sent every time the authorizations are successfully used so that sub-authorizations can update their internal state.",
-      "type": "object",
-      "required": [
-        "update_executed_authorization_state"
-      ],
-      "properties": {
-        "update_executed_authorization_state": {
-          "type": "object",
-          "required": [
-            "msgs",
-            "sender"
-          ],
-          "properties": {
-            "msgs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/CosmosMsg_for_Empty"
-              }
-            },
-            "sender": {
               "$ref": "#/definitions/Addr"
             }
           }
@@ -132,26 +39,6 @@
               "items": {
                 "$ref": "#/definitions/CosmosMsg_for_Empty"
               }
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "replace_owner"
-      ],
-      "properties": {
-        "replace_owner": {
-          "type": "object",
-          "required": [
-            "new_dao"
-          ],
-          "properties": {
-            "new_dao": {
-              "$ref": "#/definitions/Addr"
             }
           }
         }
@@ -222,7 +109,7 @@
       ]
     },
     "Binary": {
-      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>. See also <https://github.com/CosmWasm/cosmwasm/blob/main/docs/MESSAGE_TYPES.md>.",
       "type": "string"
     },
     "Coin": {
