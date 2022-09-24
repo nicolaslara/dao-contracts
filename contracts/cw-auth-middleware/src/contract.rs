@@ -68,20 +68,17 @@ impl Authorization<ExecuteMsg, Empty, ContractError> for AuthorizationMiddleware
         info: MessageInfo,
         msg: ExecuteMsg,
     ) -> Result<Response, AuthorizationError<ContractError>> {
-        let config = self.state.config.load(deps.storage)?;
-        if info.sender != config.dao {
-            return Err(AuthorizationError::ContractError(
-                ContractError::UnauthorizedBecause {
-                    reason: "Only the dao can add or remove authorizations".to_string(),
-                },
-            ));
-        }
-
         match msg {
             ExecuteMsg::SetAuthorization { auth_contract } => {
                 self.set_authorization(deps, info, auth_contract)
             }
-            ExecuteMsg::Execute { msgs } => self.execute_proposal(deps.as_ref(), msgs, info.sender),
+            ExecuteMsg::Execute { msgs } => {
+                if !self.is_authorized(deps.as_ref(), &msgs, &info.sender)? {
+                    return Err(AuthorizationError::Unauthorized {});
+                }
+
+                self.execute_proposal(deps.as_ref(), msgs, info.sender)
+            }
         }
         .map_err(|e| AuthorizationError::ContractError(e))
     }
@@ -95,10 +92,9 @@ impl AuthorizationMiddlewareContract {
         address: Addr,
     ) -> Result<Response, ContractError> {
         let config = self.state.config.load(deps.storage)?;
-        if config.dao != info.sender {
-            // Only DAO can add authorizations
+        if info.sender != config.dao {
             return Err(ContractError::UnauthorizedBecause {
-                reason: "Sender can't set authorization.".to_string(),
+                reason: "Only the dao can add or remove authorizations".to_string(),
             });
         }
 

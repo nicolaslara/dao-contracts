@@ -1,12 +1,10 @@
 use cosmwasm_std::{coin, coins, to_binary, Addr, BankMsg, CosmosMsg, Empty};
+use cw_authorizations::msg::AuthoriazationExecuteMsg;
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
 use cw_core::msg::ModuleInstantiateInfo;
 
-use crate::{
-    interface::AuthoriazationExecuteMsg,
-    msg::{ExecuteMsg, InstantiateMsg},
-};
+use crate::msg::{ExecuteMsg, InstantiateMsg};
 
 const CREATOR_ADDR: &str = "creator";
 
@@ -27,8 +25,7 @@ fn cw_auth_manager() -> Box<dyn Contract<Empty>> {
         crate::contract::execute,
         crate::contract::instantiate,
         crate::contract::query,
-    )
-    .with_reply(crate::contract::reply);
+    );
     Box::new(contract)
 }
 
@@ -50,12 +47,22 @@ fn cw_message_filter_contract() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
-fn cw_and_contract() -> Box<dyn Contract<Empty>> {
+fn cw_satisfies_all_contract() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
-        and::contract::execute,
-        and::contract::instantiate,
-        and::contract::query,
+        satisfies_all::contract::execute,
+        satisfies_all::contract::instantiate,
+        satisfies_all::contract::query,
     );
+    Box::new(contract)
+}
+
+fn cw_satisfies_any_contract() -> Box<dyn Contract<Empty>> {
+    let contract = ContractWrapper::new(
+        satisfies_any::contract::execute,
+        satisfies_any::contract::instantiate,
+        satisfies_any::contract::query,
+    )
+    .with_reply(satisfies_any::contract::reply);
     Box::new(contract)
 }
 
@@ -175,13 +182,13 @@ fn test_direct_authorizations() {
         .unwrap();
 
     // Only the dao can add authorizations to the whitelist
-    let whitelisted_addr = Addr::unchecked("whitelisted_addr");
+    let whitelisted_sender = Addr::unchecked("whitelisted_addr");
     let _err = app
         .execute_contract(
             Addr::unchecked("Anyone"),
             whitelist_addr.clone(),
             &whitelist::msg::ExecuteMsg::Allow {
-                addr: whitelisted_addr.to_string(),
+                addr: whitelisted_sender.to_string(),
             },
             &[],
         )
@@ -190,20 +197,21 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
         whitelist_addr.clone(),
-        &whitelist::msg::ExecuteMsg::Allow {
-            addr: whitelisted_addr.to_string(),
-        },
+        &AuthoriazationExecuteMsg::Extension(whitelist::msg::ExecuteMsg::Allow {
+            addr: whitelisted_sender.to_string(),
+        }),
         &[],
     )
     .unwrap(); // The address has been whitelisted
 
     // Create an *and* contract so that we can build more complex auths
-    let and_id = app.store_code(cw_and_contract());
+    let and_id = app.store_code(cw_satisfies_all_contract());
     let and_addr = app
         .instantiate_contract(
             and_id,
             Addr::unchecked("Shouldn't matter"),
-            &and::msg::InstantiateMsg {
+            &satisfies_all::msg::InstantiateMsg {
+                admin: core_addr.clone(),
                 parent: core_addr.clone(),
                 children: vec![whitelist_addr.clone()],
             },
@@ -213,12 +221,50 @@ fn test_direct_authorizations() {
         )
         .unwrap();
 
-    // Add the whitelist to the list of auths
+    // Add the whitelist to the list of auths in the *and* contract
+    app.execute_contract(
+        Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
+        and_addr.clone(),
+        &AuthoriazationExecuteMsg::Extension(satisfies_all::msg::ExecuteMsg::AddChild {
+            addr: whitelist_addr.clone(),
+        }),
+        &[],
+    )
+    .unwrap();
+
+    // Add an "any" contract as entrypoint
+    let auth_entrypoint_id = app.store_code(cw_satisfies_any_contract());
+    let auth_entrypoint_addr = app
+        .instantiate_contract(
+            auth_entrypoint_id,
+            Addr::unchecked("Shouldn't matter"),
+            &satisfies_any::msg::InstantiateMsg {
+                admin: core_addr.clone(),
+                parent: core_addr.clone(),
+                children: vec![],
+            },
+            &[],
+            "Entrypoint (any suba_uth)",
+            None,
+        )
+        .unwrap();
+
     app.execute_contract(
         Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
         auth_manager.clone(),
-        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::AddAuthorization {
-            auth_contract: and_addr.to_string(),
+        &AuthoriazationExecuteMsg::Extension(ExecuteMsg::SetAuthorization {
+            auth_contract: auth_entrypoint_addr.clone(),
+        }),
+        &[],
+    )
+    .unwrap();
+
+    // Add the and to the any. This is all very confusing and should be simplified.
+    app.execute_contract(
+        Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
+        auth_entrypoint_addr.clone(),
+        &AuthoriazationExecuteMsg::Extension(satisfies_any::msg::ExecuteMsg::AddChild {
+            addr: and_addr.clone(),
         }),
         &[],
     )
@@ -237,7 +283,7 @@ fn test_direct_authorizations() {
 
     // Execute the proposal by someone who is whitelisted
     app.execute_contract(
-        whitelisted_addr.clone(),
+        whitelisted_sender.clone(),
         auth_manager.clone(),
         &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute { msgs: vec![msg] }),
         &[],
@@ -251,7 +297,7 @@ fn test_direct_authorizations() {
             message_filter_id,
             Addr::unchecked("Shouldn't matter"),
             &message_filter::msg::InstantiateMsg {
-                dao: core_addr.clone(),
+                parent: core_addr.clone(),
                 kind: message_filter::state::Kind::Allow {},
             },
             &[],
@@ -263,9 +309,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
         and_addr.clone(),
-        &and::msg::ExecuteMsg::AddChild {
+        &AuthoriazationExecuteMsg::Extension(satisfies_all::msg::ExecuteMsg::AddChild {
             addr: message_filter_addr.clone(),
-        },
+        }),
         &[],
     )
     .unwrap();
@@ -275,10 +321,10 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal
         message_filter_addr.clone(),
-        &message_filter::msg::ExecuteMsg::AddAuthorization {
+        &AuthoriazationExecuteMsg::Extension(message_filter::msg::ExecuteMsg::AddAuthorization {
             addr: employee_addr.clone(),
             msg: r#"{"bank": {"send": {"to_address": {}, "amount": [{"denom": "juno", "amount": {}}]}}}"#.to_string(),
-        },
+        }),
         &[],
     )
     .unwrap();
@@ -293,7 +339,7 @@ fn test_direct_authorizations() {
 
     // Someone without bank permissions tries to execute the proposal
     app.execute_contract(
-        whitelisted_addr.clone(),
+        whitelisted_sender.clone(),
         auth_manager.clone(),
         &AuthoriazationExecuteMsg::Extension(ExecuteMsg::Execute {
             msgs: vec![msg.clone()],
@@ -317,9 +363,9 @@ fn test_direct_authorizations() {
     app.execute_contract(
         Addr::unchecked(core_addr.clone()), // Cheating here. This should go through a proposal or done by an authorized user
         whitelist_addr.clone(),
-        &whitelist::msg::ExecuteMsg::Allow {
+        &AuthoriazationExecuteMsg::Extension(whitelist::msg::ExecuteMsg::Allow {
             addr: employee_addr.to_string(),
-        },
+        }),
         &[],
     )
     .unwrap(); // The address has been whitelisted

@@ -1,5 +1,5 @@
 [workspace]
-members = ["contracts/*", "packages/*", "authorizations/*", "debug/*"]
+members = ["contracts/*", "packages/*", "debug/*"]
 
 
 [profile.release.package.stake-cw20-external-rewards]
